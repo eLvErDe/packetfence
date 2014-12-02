@@ -103,7 +103,7 @@ Depends: ${misc:Depends}, vlan, make,
 # required for perl 5.12+ (made perl setuid optional) and most distros went without it
  packetfence-pfcmd-suid,
 # Cluster Sync
- libjson-rpc-perl
+ libjson-rpc-perl, haproxy (>= 1.5), keepalived (>= 1.2)
 Description: PacketFence network registration / worm mitigation system
  PacketFence is an open source network access control (NAC) system.
  It can be used to effectively secure networks, from small to very large
