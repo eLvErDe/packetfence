@@ -264,6 +264,8 @@ Requires: perl(Test::NoWarnings)
 Requires: perl(Net::UDP)
 # For managing the number of connections per device
 Requires: mod_qos
+# Cluster Sync
+Requires: perl(JSON::RPC)
 
 %description -n %{real_name}
 
