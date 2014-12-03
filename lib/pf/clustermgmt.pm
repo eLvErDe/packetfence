@@ -48,10 +48,12 @@ sub active_active : Public(ip:str, dhcpd:bool, activeip:str, mysql:str, priority
         next if (!isenabled($cfg->{'active_active_enabled'}));
         my $current_network = NetAddr::IP->new( $cfg->{'ip'}, $cfg->{'mask'} );
         if ( $current_network->contains($ip) ) {
+            # Local Modification
             $cs->update($interface, { active_active_mysql_master => $obj->{mysql}}) if (defined($obj->{mysql}) && $obj->{mysql});
             $cs->update($interface, { active_active_dhcpd_master => '0'}) if $obj->{dhcpd};
             $cs->update($interface, { active_active_ip => $obj->{activeip}}) if $obj->{activeip};
 
+            # Update members if the local ip or the remote ip missed
             my @members = split(',',$cfg->{'active_active_members'});
             if (!( grep { $_ eq $obj->{ip} } @members ) || !( grep { $_ eq $cfg->{'ip'} } @members )) {
                 push(@members, $obj->{ip});
@@ -59,12 +61,24 @@ sub active_active : Public(ip:str, dhcpd:bool, activeip:str, mysql:str, priority
                 @members = uniq(@members);
                 $cs->update($interface, { active_active_members => join(',',@members)});
             }
+            # Update vrrp priority
             my $priority;
             if (!defined($cfg->{'active_active_priority'})) {
+                # default priority
                 $priority = 120;
             } else {
-                $priority = $cfg->{'active_active_priority'};
+                #Priority conflict
+                if ($obj->{priority} eq $cfg->{'active_active_priority'}) {
+                    if ($obj->{priority} eq 150) {
+                        $priority = 120;
+                    } else {
+                        $priority = $cfg->{'active_active_priority'} + 1;
+                    }
+                } else {
+                    $priority = $cfg->{'active_active_priority'};
+                }
             }
+            # Update global configuration with new members
             if ($cfg->{'type'} eq 'management') {
                 my $pfcs = pf::ConfigStore::Pf->new();
                 push(@members, $obj->{ip});
@@ -81,6 +95,7 @@ sub active_active : Public(ip:str, dhcpd:bool, activeip:str, mysql:str, priority
                              member_ip => $cfg->{'ip'},
                              priority => $priority,
                            };
+            # Send mysql_master ip
             $hash_ref->{'mysql_master'} = $cfg->{'active_active_mysql_master'} || $obj->{mysql} if (defined($obj->{mysql}) && $obj->{mysql});
             return $hash_ref;
         }
@@ -110,10 +125,10 @@ sub sync_cluster {
 
     my @ints = uniq(@listen_ints,@dhcplistener_ints);
 
-    if ( (defined $Config{"interface $int"}{'active_active_mysql_master'}) && ($Config{"interface $int"}{'ip'} eq $Config{"interface $int"}{'active_active_mysql_master'}) ) {
+    if ( (defined $Config{"interface $int"}{'active_active_priority'}) && (defined $Config{"interface $int"}{'active_active_mysql_master'}) && ($Config{"interface $int"}{'ip'} eq $Config{"interface $int"}{'active_active_mysql_master'}) ) {
         $priority = '150';
     } else {
-        $priority = $Config{"interface $int"}{'active_active_priority'} || 0;
+        $priority = $Config{"interface $int"}{'active_active_priority'};
     }
 
     my $cs = pf::ConfigStore::Interface->new();
